@@ -10,12 +10,76 @@ import {GovernorTimelockControl} from "@openzeppelin/contracts/governance/extens
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract MyGovernor is Governor, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl {
+contract MyGovernor is Governor, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl, AccessControl {
     constructor(
         IVotes _token,
         TimelockController _timelock
     ) Governor("MyGovernor") GovernorVotes(_token) GovernorVotesQuorumFraction(4) GovernorTimelockControl(_timelock) {}
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override(Governor, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId) || Governor.supportsInterface(interfaceId) || AccessControl.supportsInterface(interfaceId);
+    }
+
+    bytes32 public constant MEMBER_ROLE = keccak256("MEMBER_ROLE");
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
+    bytes32 public constant REVIEWER_ROLE = keccak256("REVIEWER_ROLE");
+
+    modifier onlyMember() {
+        require(isMember(msg.sender), "Account is not a member.");
+        _;
+    }
+    // manager can be owner, admin or committee
+    modifier onlyManager() {
+        require(isManager(msg.sender), "Only manager allowed.");
+        _;
+    }
+
+    modifier onlyIssuer() {
+        require(isIssuer(msg.sender), "Only issuer allowed.");
+        _;
+    }
+
+    modifier onlyReviewer() {
+        require(isReviewer(msg.sender), "Only reviewer allowed.");
+        _;
+    }
+
+    function isMember(address _member) public view returns (bool) {
+        return hasRole(MEMBER_ROLE, _member);
+    }
+
+    function isManager(address _member) public view returns (bool) {
+        return hasRole(MANAGER_ROLE, _member);
+    }
+
+    function isIssuer(address _member) public onlyMember view returns (bool) {
+        return hasRole(ISSUER_ROLE, _member);
+    }
+
+    function isReviewer(address _member) public onlyMember view returns (bool) {
+        return hasRole(REVIEWER_ROLE, _member);
+    }
+
+    function addMember(address _member) public onlyManager returns (bool) {
+        require(!isMember(_member), "The account is already a member.");
+        grantRole(MEMBER_ROLE, _member);
+        return true;
+    }
+
+    function addIssuer(address _member) public onlyManager returns (bool) {
+        require(!isIssuer(_member), "The member is already an issuer.");
+        grantRole(ISSUER_ROLE, _member);
+        return true;
+    }
+
+    function addReviewer(address _member) public onlyManager returns (bool) {
+        require(!isReviewer(_member), "The member is already a reviewer.");
+        grantRole(REVIEWER_ROLE, _member);
+        return true;
+    }
 
     function votingDelay() public pure override returns (uint256) {
         return 7200; // 1 day
@@ -71,4 +135,5 @@ contract MyGovernor is Governor, GovernorCountingSimple, GovernorVotes, Governor
     function _executor() internal view override(Governor, GovernorTimelockControl) returns (address) {
         return super._executor();
     }
+
 }
