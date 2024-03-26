@@ -26,6 +26,7 @@ contract MyGovernor is Governor, GovernorCountingSimple, GovernorVotes, Governor
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
     bytes32 public constant REVIEWER_ROLE = keccak256("REVIEWER_ROLE");
+    bytes32 public constant DEVELOPER_ROLE = keccak256("DEVELOPER_ROLE");
 
     modifier onlyMember() {
         require(isMember(msg.sender), "Account is not a member.");
@@ -47,6 +48,11 @@ contract MyGovernor is Governor, GovernorCountingSimple, GovernorVotes, Governor
         _;
     }
 
+    modifier onlyDeveloper() {
+        require(isDeveloper(msg.sender), "Only developer allowed.");
+        _;
+    }
+
     function isMember(address _member) public view returns (bool) {
         return hasRole(MEMBER_ROLE, _member);
     }
@@ -63,22 +69,38 @@ contract MyGovernor is Governor, GovernorCountingSimple, GovernorVotes, Governor
         return hasRole(REVIEWER_ROLE, _member);
     }
 
-    function addMember(address _member) public onlyManager returns (bool) {
+    function isDeveloper(address _member) public onlyMember view returns (bool) {
+        return hasRole(DEVELOPER_ROLE, _member);
+    }
+
+    function addMember(address _member) public onlyManager {
         require(!isMember(_member), "The account is already a member.");
         grantRole(MEMBER_ROLE, _member);
-        return true;
     }
 
-    function addIssuer(address _member) public onlyManager returns (bool) {
+    function addIssuer(address _member) public onlyManager {
         require(!isIssuer(_member), "The member is already an issuer.");
         grantRole(ISSUER_ROLE, _member);
-        return true;
     }
 
-    function addReviewer(address _member) public onlyManager returns (bool) {
+    function addReviewer(address _member) public onlyManager {
         require(!isReviewer(_member), "The member is already a reviewer.");
         grantRole(REVIEWER_ROLE, _member);
-        return true;
+    }
+
+    function addDeveloper(address _member) public onlyManager {
+        require(!isReviewer(_member), "The member is already a developer.");
+        grantRole(DEVELOPER_ROLE, _member);
+    }
+
+    function removeMember(address _member) public onlyManager {
+        require(isMember(_member), "The account is not a member.");
+        revokeRole(MEMBER_ROLE, _member);
+    }
+
+    function vote(uint256 _proposalID, address _member, uint8 _support) public onlyMember {
+        require(proposalProposer(_proposalID) != _member, "Reviewer can not vote his/her review.");
+        _castVote(_proposalID, _member, _support, "");
     }
 
     function votingDelay() public pure override returns (uint256) {
